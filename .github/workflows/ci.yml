@@ -6,11 +6,15 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: windows-latest
+            python-version: "3.12"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,3 +25,16 @@ jobs:
       # Tests marked "timing" assert on wall-clock measurements; shared CI runners are too noisy for them.
       - name: Test
         run: python -m pytest -m "not timing"
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t infer-bench .
+      # selfcheck asserts on timing, which a shared runner cannot promise, so the smoke test is a short real run.
+      - name: Smoke test
+        run: |
+          docker run --rm infer-bench --version
+          docker run --rm --entrypoint sh infer-bench -c \
+            "infer-bench demo-model classifier -o m.onnx && infer-bench run m.onnx --iterations 50 --no-save"

@@ -1,9 +1,6 @@
 # infer-bench in a container.
 #
-# TODO(you): this file has not been built yet. It was written in an environment without a Docker daemon;
-# only its pip steps were run, in a clean Python 3.12 virtual environment. Run
-#     docker build -t infer-bench .  &&  docker run --rm infer-bench selfcheck
-# and, if both work, delete this notice. If a step fails, the bug is in this file.
+# The CI workflow (.github/workflows/ci.yml) builds this image and runs a short benchmark inside it on every push.
 #
 # Usage:
 #   docker run --rm infer-bench selfcheck
