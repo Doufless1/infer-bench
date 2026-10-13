@@ -5,6 +5,7 @@ from infer_bench import accuracy
 from infer_bench.backends import OrtBackend
 from infer_bench.backends.base import Backend, TensorSpec
 from infer_bench.inputs import synthetic_feeds
+from infer_bench.quantize import quantize_int8
 
 
 class FnBackend(Backend):
@@ -183,10 +184,16 @@ def test_fp32_against_itself_through_onnx_runtime(models):
     assert out["cosine_similarity_mean"] == pytest.approx(1.0) and out["top1_agreement"] == 1.0
 
 
-def test_int8_classifier_stays_close_to_fp32(models):
+def test_int8_classifier_stays_close_to_fp32(models, tmp_path):
+    # 7-bit weights (reduce_range) on purpose. On x86 CPUs without VNNI, ONNX Runtime's U8S8 kernels add pairs
+    # of uint8 x int8 products in 16 bits, which can saturate; with |weight| <= 64 a pair is at most
+    # 2 * 255 * 64 = 32640 and cannot. The integer results, and so this test, are then the same on every CPU:
+    # with full 8-bit weights the cosine was 0.998 on a VNNI laptop and 0.986 on some GitHub-hosted runners.
+    int8 = tmp_path / "cls_int8_7bit.onnx"
     ref, cand = OrtBackend(), OrtBackend()
     ref.load(models["cls"])
-    cand.load(models["cls_int8"])
+    quantize_int8(models["cls"], int8, synthetic_feeds(ref.inputs, 1, count=32, seed=1), reduce_range=True)
+    cand.load(int8)
     out = accuracy.compare_models(ref, cand, synthetic_feeds(ref.inputs, 1, count=60, seed=99), task="classification")
     assert out["cosine_similarity_mean"] > 0.99
     assert 0.8 <= out["top1_agreement"] <= 1.0
