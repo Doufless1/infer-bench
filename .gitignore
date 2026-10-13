@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+build/
+dist/
+
+# models can be large and are generated or downloaded; results are yours to commit or not
+models/*
+!models/.gitkeep
+*.onnx
+results/*
+!results/.gitkeep
+!results/published/

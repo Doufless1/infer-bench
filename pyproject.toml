@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "infer-bench"
+version = "0.1.0"
+description = "A small, honest inference benchmarking harness: latency percentiles, throughput, accuracy vs a reference model and power, with reproducible JSON results and a dashboard."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Konstantin Apostolov" }]
+keywords = ["benchmark", "inference", "onnx", "quantization", "latency", "edge-ai"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+  "numpy>=1.26",
+  "onnx>=1.16",
+  "onnxruntime>=1.18",
+  "pillow>=10.0",
+  "psutil>=5.9",
+]
+
+[project.optional-dependencies]
+dashboard = ["dash>=2.16,<5", "plotly>=5.20"]
+dev = ["pytest>=8.0", "dash>=2.16,<5", "plotly>=5.20"]
+
+[project.scripts]
+infer-bench = "infer_bench.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["infer_bench*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+  "timing: asserts on wall-clock measurements, so it can fail on a busy or shared machine (deselect with -m 'not timing')",
+]
+filterwarnings = [
+  # Dash 4 announces that dash_table will leave the core package in a future major version (see README).
+  "ignore:(?s).*dash_table.DataTable will be removed.*:DeprecationWarning",
+]

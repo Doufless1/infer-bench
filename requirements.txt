@@ -1,0 +1,4 @@
+# Install the package with its dashboard extras and everything it needs:
+#     pip install -r requirements.txt
+# (the dependency list itself lives in pyproject.toml, so there is only one place to keep up to date)
+-e .[dashboard]
