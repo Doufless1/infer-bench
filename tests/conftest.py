@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -50,6 +51,10 @@ def with_opset(path_in: Path, path_out: Path, version: int) -> Path:
 @pytest.fixture()
 def fake_rapl(tmp_path) -> Path:
     """A fake /sys/class/powercap tree with one package, two sub-domains and an MMIO duplicate."""
+    if sys.platform == "win32":
+        # RAPL is a Linux sysfs interface, and its directory names ("intel-rapl:0") contain a colon,
+        # which Windows does not allow in file names. The meter itself reports "unavailable" there.
+        pytest.skip("RAPL is Linux-only; a fake powercap tree cannot be built on Windows")
     root = tmp_path / "powercap"
 
     def domain(name_dir: str, name: str, energy_uj: int, max_range: int = 262_143_328_850) -> None:
