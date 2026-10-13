@@ -126,7 +126,7 @@ pitfall 3), MinMax calibration by default
 ranges are measured once on a calibration set and baked in, so **calibrate on pictures that look like your
 real data** (`--images`). Calibrating on the synthetic textures only makes sense for the demo models.
 
-Four pitfalls were met while testing, and the tool now diagnoses each of them:
+Five pitfalls were met while testing, and the tool now diagnoses each of them:
 
 1. **Mixed-scale outputs.** A YOLO-style output tensor holds pixel-scale box values and 0..1 class scores. If that
    tensor is quantised, both share one scale and the scores round to zero. On the demo detector (a constructed
@@ -146,6 +146,10 @@ Four pitfalls were met while testing, and the tool now diagnoses each of them:
    load** (found only by the next command). `quantize` therefore picks per-tensor weights automatically for an
    old opset (and says so), and it loads every INT8 file it writes: if ONNX Runtime cannot, the command fails with
    the reason and a hint instead of printing "Wrote ...". `--per-channel` forces the old behaviour.
+   The per-tensor fallback has a price that depends on the model. On MobileNetV2 from the ONNX Model Zoo
+   (opset 12), top-1 agreement with FP32 on 300 real pictures was 81.0 % per tensor and 87.7 % after converting
+   the model to opset 13 with `onnx.version_converter` and quantising per channel (ResNet-50: 93.3 % and 95.7 %).
+   Depthwise convolutions, whose channels have very different weight ranges, suffer most from a shared scale.
 4. **INT8 is not automatically faster, or good.** Speed-ups depend on the CPU (integer dot-product instructions),
    on how many operators actually become integer operators, and on the cost of the extra quantise/dequantise
    steps. In the development sandbox (a small cloud VM) the tiny demo classifier ran *slower* as INT8 than as
@@ -154,6 +158,14 @@ Four pitfalls were met while testing, and the tool now diagnoses each of them:
    that INT8 detector, calibrated naively on a dozen photos without any text, produced all-zero output on some
    images: its cosine similarity to FP32 averaged 0.01 over 13 real pictures. That is exactly why the harness
    exists: measure speed and agreement instead of assuming either.
+5. **`--method entropy` is MinMax.** ONNX Runtime's `quantize_static` runs its entropy calibrator with 128 histogram
+   bins and 128 quantised bins and has no option to change either, so the KL-divergence search
+   (`range(num_quantized_bins // 2, num_bins // 2 + 1)`) has exactly one candidate threshold: the full min/max range.
+   On MobileNetV2 with ONNX Runtime 1.31 the two methods wrote byte-identical files, the entropy run taking 282 s
+   instead of 15 s. A real search with 2048 bins (ranges passed through `TensorQuantOverrides`) was tried and gave
+   *lower* agreement than MinMax on that model (83.7 % vs 87.7 %), so `quantize` warns instead of re-implementing
+   the calibrator, and `test_entropy_calibration_is_diagnosed_as_identical_to_minmax` fails if a future ONNX Runtime
+   makes the two outputs differ.
 
 ## 6. Power and energy
 
@@ -210,6 +222,7 @@ every time. The timing itself is of course not reproducible to the nanosecond.
   the timed call.
 * No energy measurement of accelerators or whole systems without an external meter.
 * No labelled-dataset accuracy (mAP, top-1 on ImageNet).
-* Not tested on Windows or macOS (console output is plain ASCII on purpose, for Windows code pages).
+* Tested on Linux and Windows 11, not on macOS (the RAPL tests are skipped on Windows, which has no RAPL). Console
+  output is plain ASCII on purpose, for Windows code pages.
 * Latency here is the latency of a call into the runtime from Python. It is not end-to-end latency of a camera
   pipeline.
