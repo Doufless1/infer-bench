@@ -22,6 +22,17 @@ _METHODS = {"minmax": "MinMax", "entropy": "Entropy", "percentile": "Percentile"
 # written without complaint and then cannot be loaded (found while testing a real OCR model).
 MIN_OPSET_PER_CHANNEL = 13
 
+# ONNX Runtime's quantize_static builds the entropy histogram with 128 bins and searches it with 128
+# quantised bins, and has no option to change either. The KL-divergence search then has exactly one
+# candidate threshold, the full min/max range, so "entropy" gives the MinMax model after a much longer
+# calibration (found on MobileNetV2: byte-identical files with ONNX Runtime 1.31).
+ENTROPY_SAME_AS_MINMAX = (
+    "Entropy calibration through ONNX Runtime's quantize_static uses 128 histogram bins and 128 quantised bins, "
+    "which leaves the KL-divergence search a single candidate threshold: the full min/max range. The result is the "
+    "same model --method minmax gives, after a much longer calibration. Use --method minmax, or --method percentile "
+    "to clip outliers."
+)
+
 
 class FeedReader:
     """Feeds calibration inputs to ONNX Runtime, one dict per call."""
@@ -186,6 +197,8 @@ def quantize_int8(
         source, pre_note = (_pre_process(model_in, Path(tmp)) if pre_process else (model_in, "pre-processing disabled"))
         warnings = quantization_warnings(source)
         notes: list[str] = []
+        if method == "entropy":
+            warnings.append(ENTROPY_SAME_AS_MINMAX)
         opset = default_opset(source)
         if per_channel is None:
             per_channel = opset is None or opset >= MIN_OPSET_PER_CHANNEL

@@ -54,6 +54,19 @@ def test_quantize_rejects_bad_options(models, tmp_path, kwargs, message):
         quantize.quantize_int8(models["cls"], tmp_path / "x.onnx", feeds, **kwargs)
 
 
+def test_entropy_calibration_is_diagnosed_as_identical_to_minmax(models, tmp_path):
+    # Pins ONNX Runtime's behaviour: if this starts failing because the two files differ, a new ONNX Runtime
+    # version runs a real entropy search and the warning (ENTROPY_SAME_AS_MINMAX) must go.
+    backend = OrtBackend()
+    backend.load(models["cls"])
+    feeds = synthetic_feeds(backend.inputs, 1, count=8, seed=3)
+    minmax = quantize.quantize_int8(models["cls"], tmp_path / "minmax.onnx", feeds, method="minmax")
+    entropy = quantize.quantize_int8(models["cls"], tmp_path / "entropy.onnx", feeds, method="entropy")
+    assert (tmp_path / "minmax.onnx").read_bytes() == (tmp_path / "entropy.onnx").read_bytes()
+    assert quantize.ENTROPY_SAME_AS_MINMAX in entropy["warnings"]
+    assert quantize.ENTROPY_SAME_AS_MINMAX not in minmax["warnings"]
+
+
 def test_quantize_needs_calibration_data(models, tmp_path):
     with pytest.raises(ValueError, match="at least one calibration"):
         quantize.quantize_int8(models["cls"], tmp_path / "x.onnx", [])
